@@ -4,6 +4,7 @@
 - **Nombre de la App:** MiLudoteca
 - **Propósito:** Control personal de juegos de mesa (propios, prestados y jugados de terceros) e historial de partidas a partir de exportaciones CSV de BoardGameGeek (BGG).
 - **Despliegue:** GitHub Pages (100% client-side, Zero-Build, Vanilla JS con ES Modules y WebComponents nativos).
+- **URL live:** https://carlosguariglia.github.io/mi-ludoteca/ (deploy automático con GitHub Actions desde `main`).
 - **Persistencia (Local-First + Cloud Sync):** 
   - Caché local instantáneo en `localStorage` bajo la clave `miludoteca_state_v1`.
   - Sincronización bajo demanda contra un GitHub Gist privado (`miludoteca-db.json`) usando GitHub REST API v3.
@@ -53,4 +54,4 @@
 ### Despliegue
 - [x] `.github/workflows/pages.yml`: validación de sintaxis y publicación del sitio estático en GitHub Pages.
 - [x] `README.md`, `.gitignore` y `favicon.svg`; PapaParse 5.4.1 vendorizado en `js/vendor/`.
-- [ ] Publicar el repo en GitHub, habilitar Pages y registrar la URL live en el README.
+- [x] Publicado en GitHub Pages: https://carlosguariglia.github.io/mi-ludoteca/ (workflow con `enablement: true`, sitio verificado en vivo).
