@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="theme-color"
+      content="#f5f3ee"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0d1117"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta
+      name="description"
+      content="MiLudoteca: tu colección de juegos de mesa y tu historial de partidas, con sincronización manual mediante un GitHub Gist privado."
+    />
+    <title>MiLudoteca · Juegos de mesa y partidas</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#games-grid">Saltar al listado de juegos</a>
+
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="4" />
+              <circle cx="8.2" cy="8.2" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="15.8" cy="8.2" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="8.2" cy="15.8" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="15.8" cy="15.8" r="1.15" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <div class="brand-copy">
+            <h1>MiLudoteca</h1>
+            <p>Tu colección, tus partidas.</p>
+          </div>
+        </div>
+
+        <section class="sync-panel" aria-label="Sincronización con GitHub Gist">
+          <div
+            id="sync-status"
+            class="sync-status"
+            data-state="unconfigured"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="status-copy">
+              <span id="sync-status-text" class="status-text">Sin configurar</span>
+              <span id="sync-last" class="status-last"
+                >Configurá el token y el gistId para sincronizar.</span
+              >
+            </span>
+          </div>
+          <div class="sync-actions">
+            <button id="btn-sync-config" class="btn btn-secondary" type="button">
+              Configurar Gist
+            </button>
+            <button
+              id="btn-pull"
+              class="btn btn-secondary"
+              type="button"
+              title="Configurá el Gist para bajar cambios"
+              disabled
+            >
+              Bajar
+            </button>
+            <button
+              id="btn-push"
+              class="btn btn-primary"
+              type="button"
+              title="Configurá el Gist para subir cambios"
+              disabled
+            >
+              Subir
+            </button>
+          </div>
+        </section>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="toolbar" aria-label="Filtros y acciones">
+        <div class="toolbar-row">
+          <div class="segmented" role="group" aria-label="Filtrar por propiedad">
+            <button
+              class="segmented-btn is-active"
+              type="button"
+              data-filter="all"
+              aria-pressed="true"
+            >
+              Todos
+            </button>
+            <button
+              class="segmented-btn"
+              type="button"
+              data-filter="owned"
+              aria-pressed="false"
+            >
+              Propios
+            </button>
+            <button
+              class="segmented-btn"
+              type="button"
+              data-filter="borrowed"
+              aria-pressed="false"
+            >
+              Prestados
+            </button>
+            <button
+              class="segmented-btn"
+              type="button"
+              data-filter="played_elsewhere"
+              aria-pressed="false"
+            >
+              Jugados
+            </button>
+          </div>
+
+          <div class="players-filter">
+            <label class="field-label" for="players-filter">Jugadores</label>
+            <div class="players-control">
+              <input
+                id="players-filter"
+                class="input"
+                type="number"
+                min="1"
+                max="20"
+                inputmode="numeric"
+                placeholder="Ej. 4"
+                autocomplete="off"
+              />
+              <button
+                id="btn-players-clear"
+                class="btn btn-ghost"
+                type="button"
+                aria-label="Limpiar filtro de jugadores"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
+
+          <div class="toolbar-actions">
+            <button id="btn-add-borrowed" class="btn btn-secondary" type="button">
+              + Agregar prestado
+            </button>
+            <button id="btn-import-csv" class="btn btn-secondary" type="button">
+              Importar CSV
+            </button>
+            <input
+              id="import-csv-input"
+              type="file"
+              accept=".csv,text/csv"
+              hidden
+            />
+          </div>
+        </div>
+
+        <p id="results-summary" class="results-summary" aria-live="polite"></p>
+      </section>
+
+      <section
+        id="games-grid"
+        class="games-grid"
+        aria-label="Juegos de la ludoteca"
+      ></section>
+
+      <div id="empty-message" class="empty-state" hidden>
+        <svg
+          class="empty-icon"
+          viewBox="0 0 48 48"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="7" y="13" width="34" height="27" rx="5" />
+          <path d="M7 22h34" />
+          <path d="M16 13V9a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v4" />
+          <path d="M16 30h8" />
+        </svg>
+        <h2 id="empty-title">Todavía no cargaste juegos</h2>
+        <p id="empty-text">
+          Importá tu colección de BGG o agregá un juego prestado para empezar.
+        </p>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <p>
+          MiLudoteca · Tus datos viven en este navegador y, si querés, en tu Gist
+          privado.
+        </p>
+        <div class="footer-stats" aria-label="Totales de la ludoteca">
+          <span>Juegos <strong id="total-games">0</strong></span>
+          <span>Partidas <strong id="total-plays">0</strong></span>
+        </div>
+      </div>
+    </footer>
+
+    <dialog
+      id="dialog-borrowed"
+      class="dialog"
+      aria-labelledby="dialog-borrowed-title"
+    >
+      <form id="form-borrowed" class="dialog-form" novalidate>
+        <header class="dialog-header">
+          <div>
+            <h2 id="dialog-borrowed-title">Agregar juego prestado</h2>
+            <p class="dialog-subtitle">
+              Sumá a tu ludoteca un juego que te prestaron.
+            </p>
+          </div>
+          <button
+            class="icon-btn"
+            type="button"
+            data-close-dialog="dialog-borrowed"
+            aria-label="Cerrar diálogo"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="form-grid">
+          <div class="field field--full">
+            <label for="borrowed-title">
+              Título <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="borrowed-title"
+              class="input"
+              name="title"
+              type="text"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="Ej. Wingspan"
+              required
+            />
+          </div>
+
+          <div class="field field--full">
+            <label for="borrowed-owner">Nota / dueño</label>
+            <input
+              id="borrowed-owner"
+              class="input"
+              name="ownerNote"
+              type="text"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="Prestado de …"
+            />
+          </div>
+
+          <div class="field">
+            <label for="borrowed-min">Mín. jugadores</label>
+            <input
+              id="borrowed-min"
+              class="input"
+              name="minPlayers"
+              type="number"
+              min="1"
+              max="99"
+              inputmode="numeric"
+              placeholder="1"
+            />
+          </div>
+
+          <div class="field">
+            <label for="borrowed-max">Máx. jugadores</label>
+            <input
+              id="borrowed-max"
+              class="input"
+              name="maxPlayers"
+              type="number"
+              min="1"
+              max="99"
+              inputmode="numeric"
+              placeholder="4"
+            />
+          </div>
+
+          <div class="field field--full">
+            <label for="borrowed-time">Duración (min)</label>
+            <input
+              id="borrowed-time"
+              class="input"
+              name="playingTime"
+              type="number"
+              min="0"
+              max="9999"
+              inputmode="numeric"
+              placeholder="0 si no la sabés"
+            />
+          </div>
+        </div>
+
+        <p id="borrowed-error" class="form-error" role="alert" hidden></p>
+
+        <footer class="dialog-actions">
+          <button
+            class="btn btn-ghost"
+            type="button"
+            data-close-dialog="dialog-borrowed"
+          >
+            Cancelar
+          </button>
+          <button class="btn btn-primary" type="submit">Guardar juego</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="dialog-play" class="dialog" aria-labelledby="play-game-title">
+      <form id="form-play" class="dialog-form" novalidate>
+        <header class="dialog-header">
+          <div>
+            <p class="dialog-eyebrow">Nueva partida</p>
+            <h2 id="play-game-title">Juego</h2>
+          </div>
+          <button
+            class="icon-btn"
+            type="button"
+            data-close-dialog="dialog-play"
+            aria-label="Cerrar diálogo"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="play-date">
+              Fecha <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input id="play-date" class="input" name="date" type="date" required />
+          </div>
+
+          <div class="field">
+            <label for="play-players">
+              Jugadores <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="play-players"
+              class="input"
+              name="players"
+              type="number"
+              min="1"
+              max="99"
+              inputmode="numeric"
+              required
+            />
+          </div>
+
+          <div class="field field--full">
+            <label for="play-notes">Notas</label>
+            <textarea
+              id="play-notes"
+              class="input"
+              name="notes"
+              rows="3"
+              maxlength="500"
+              placeholder="¿Con quién jugaron? ¿Qué expansión usaron?"
+            ></textarea>
+            <p class="field-hint">Máximo 500 caracteres.</p>
+          </div>
+        </div>
+
+        <p id="play-error" class="form-error" role="alert" hidden></p>
+
+        <footer class="dialog-actions">
+          <button
+            class="btn btn-ghost"
+            type="button"
+            data-close-dialog="dialog-play"
+          >
+            Cancelar
+          </button>
+          <button class="btn btn-primary" type="submit">Guardar partida</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog
+      id="dialog-config"
+      class="dialog"
+      aria-labelledby="dialog-config-title"
+    >
+      <form id="form-config" class="dialog-form" novalidate>
+        <header class="dialog-header">
+          <div>
+            <h2 id="dialog-config-title">Configurar GitHub Gist</h2>
+            <p class="dialog-subtitle">
+              Sincronización manual entre este navegador y tu Gist privado.
+            </p>
+          </div>
+          <button
+            class="icon-btn"
+            type="button"
+            data-close-dialog="dialog-config"
+            aria-label="Cerrar diálogo"
+          >
+            ×
+          </button>
+        </header>
+
+        <p class="dialog-copy">
+          El token se guarda solo en este navegador y nunca se muestra ni se envía
+          a otro sitio que no sea GitHub. Por seguridad, volvé a ingresarlo cada
+          vez que guardes cambios.
+        </p>
+
+        <div class="field">
+          <label for="config-token">
+            Token de GitHub <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="config-token"
+            class="input"
+            name="token"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="ghp_…"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="config-gist-id">
+            Gist ID <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="config-gist-id"
+            class="input"
+            name="gistId"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Ej. 1a2b3c4d5e6f…"
+            required
+          />
+          <p class="field-hint">
+            Necesitás un PAT con scope <code>gist</code> (token clásico) o permiso
+            <em>Gists: read and write</em> (fine-grained), y un Gist privado con el
+            archivo <code>miludoteca-db.json</code>.
+          </p>
+        </div>
+
+        <p id="config-error" class="form-error" role="alert" hidden></p>
+
+        <footer class="dialog-actions">
+          <button
+            class="btn btn-ghost"
+            type="button"
+            data-close-dialog="dialog-config"
+          >
+            Cancelar
+          </button>
+          <button class="btn btn-primary" type="submit">Guardar configuración</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <div
+      id="toast"
+      class="toast"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
+    <noscript>
+      <p class="noscript">
+        MiLudoteca necesita JavaScript para funcionar. Activá JavaScript en tu
+        navegador y recargá la página.
+      </p>
+    </noscript>
+
+    <script src="js/vendor/papaparse.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
