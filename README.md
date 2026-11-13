@@ -4,8 +4,7 @@ Control personal de juegos de mesa: colección propia, juegos prestados, juegos
 jugados en casa de otros e historial de partidas. Funciona 100% en el navegador y
 sincroniza bajo demanda contra un GitHub Gist privado.
 
-- **Demo:** `https://TU-USUARIO.github.io/mi-ludoteca/` (actualizá esta URL después del
-  primer deploy).
+- **Demo:** <https://carlosguariglia.github.io/mi-ludoteca/>.
 - **Stack:** Vanilla JS, ES Modules y WebComponents nativos. Sin build, sin framework y
   sin backend.
 - **Persistencia:** `localStorage` (local-first) + GitHub Gist privado (backup y sync
@@ -101,7 +100,7 @@ módulos y publica únicamente el sitio estático (`index.html`, `favicon.svg`, 
 3. En el repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 4. Si el workflow ya corrió antes de habilitar Pages, re-ejecutalo desde **Actions →
    Deploy MiLudoteca to GitHub Pages → Run workflow**.
-5. La URL queda en `https://TU-USUARIO.github.io/mi-ludoteca/`.
+5. La URL queda en `https://carlosguariglia.github.io/mi-ludoteca/`.
 
 ## Privacidad y seguridad
 
