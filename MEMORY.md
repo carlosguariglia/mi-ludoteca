@@ -81,3 +81,21 @@ La importación acepta también el estado crudo (`{ version, games, plays }`). L
 - El control de respaldos vive en `miludoteca_backup_meta_v1`; el estado no guarda metadatos de sincronización.
 - Importación destructiva (reemplazo total) con preview; no hay merge para mantener el flujo simple.
 - Web Share API solo se muestra si el navegador puede compartir archivos; siempre queda la descarga como fallback.
+
+## 6. Estado de la Sesión (2026-11-13)
+- [x] Refactor completo: se eliminó la sync con Gist, el token, el `gistId` y el diálogo de configuración.
+- [x] Servicios nuevos `localStore.js` y `backup.js`; `csvParser.js` ya no maneja `lastSync`.
+- [x] Migración silenciosa: al cargar un estado viejo se elimina `lastSync` del `localStorage` y se borra `miludoteca_auth`.
+- [x] Commit `40b30f2` (`refactor: reemplazar sync con Gist por copias JSON locales`) pusheado a `main`.
+- [x] Workflow de GitHub Pages run 4 en **success**; sitio live actualizado.
+- [x] Verificado en vivo con Chromium: exportar/descargar, estado “Copia guardada”, cambios sin guardar, importar con preview, reemplazo completo, archivo inválido sin tocar datos, sin requests a GitHub, sin errores de consola y sin overflow a 390 px.
+- [x] `https://carlosguariglia.github.io/mi-ludoteca/js/services/gistSync.js` devuelve **404**.
+- **Pendiente de prueba real:** Web Share con archivos (`navigator.share`) no se puede validar en Chromium headless; falta probarlo en Android/iOS.
+
+## 7. Próximos Pasos (retomar mañana)
+1. Probar el circuito completo en dos celulares reales: **Guardar copia → Compartir por WhatsApp/email → Cargar copia** en el otro dispositivo.
+2. Verificar en iOS Safari el menú de compartir archivos y el fallback de descarga.
+3. Decidir si se agrega edición y borrado de juegos/partidas desde la UI.
+4. Evaluar un modo **fusionar** en la importación (hoy solo reemplaza todo).
+5. Evaluar cifrado opcional del JSON con WebCrypto para compartir datos sensibles.
+6. Evaluar un recordatorio de respaldo más visible si pasan muchos días sin guardar copia.
