@@ -27,7 +27,8 @@ jobs:
         run: |
           node --check js/app.js
           node --check js/components/gameCard.js
-          node --check js/services/gistSync.js
+          node --check js/services/localStore.js
+          node --check js/services/backup.js
           node --check js/services/csvParser.js
 
   deploy:

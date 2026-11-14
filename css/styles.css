@@ -16,6 +16,8 @@
   --primary-strong: #4338ca;
   --primary-contrast: #ffffff;
   --danger: #b91c1c;
+  --danger-strong: #991b1b;
+  --danger-contrast: #ffffff;
   --danger-text: #991b1b;
   --success: #15803d;
   --success-text: #166534;
@@ -56,6 +58,8 @@
     --primary-strong: #a5b4fc;
     --primary-contrast: #0c1222;
     --danger: #f87171;
+    --danger-strong: #fca5a5;
+    --danger-contrast: #2b0a0a;
     --danger-text: #fca5a5;
     --success: #4ade80;
     --success-text: #86efac;
@@ -157,7 +161,7 @@ button {
 }
 
 /* --------------------------------------------------------------------------
-   Header y panel de sincronización
+   Header y copia de seguridad
    -------------------------------------------------------------------------- */
 
 .site-header {
@@ -228,14 +232,14 @@ button {
   font-size: 0.78rem;
 }
 
-.sync-panel {
+.backup-panel {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
   min-width: 0;
 }
 
-.sync-status {
+.backup-status {
   display: inline-flex;
   align-self: flex-start;
   align-items: center;
@@ -257,91 +261,48 @@ button {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.status-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.25;
-}
-
 .status-text {
   font-size: 0.82rem;
   font-weight: 700;
 }
 
-.status-last {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.72rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sync-status[data-state='unconfigured'] .status-dot {
+.backup-status[data-state='empty'] .status-dot {
   background: var(--muted);
 }
 
-.sync-status[data-state='ready'] .status-dot {
-  background: var(--primary);
+.backup-status[data-state='pending'] {
+  border-color: color-mix(in srgb, var(--warning) 38%, var(--border));
 }
 
-.sync-status[data-state='synced'] {
+.backup-status[data-state='pending'] .status-dot {
+  background: var(--warning);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+.backup-status[data-state='pending'] .status-text {
+  color: var(--warning);
+}
+
+.backup-status[data-state='saved'] {
   border-color: color-mix(in srgb, var(--success) 38%, var(--border));
 }
 
-.sync-status[data-state='synced'] .status-dot {
+.backup-status[data-state='saved'] .status-dot {
   background: var(--success);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 20%, transparent);
 }
 
-.sync-status[data-state='synced'] .status-text {
+.backup-status[data-state='saved'] .status-text {
   color: var(--success-text);
 }
 
-.sync-status[data-state='syncing'] {
-  border-color: color-mix(in srgb, var(--info) 38%, var(--border));
-}
-
-.sync-status[data-state='syncing'] .status-dot {
-  background: var(--info);
-  animation: status-pulse 1.1s ease-in-out infinite;
-}
-
-.sync-status[data-state='syncing'] .status-text {
-  color: var(--info-text);
-}
-
-.sync-status[data-state='error'] {
-  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
-}
-
-.sync-status[data-state='error'] .status-dot {
-  background: var(--danger);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent);
-}
-
-.sync-status[data-state='error'] .status-text {
-  color: var(--danger-text);
-}
-
-@keyframes status-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 42%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--info) 0%, transparent);
-  }
-}
-
-.sync-actions {
+.backup-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
 }
 
-.sync-actions .btn {
+.backup-actions .btn {
   flex: 1 1 auto;
 }
 
@@ -393,6 +354,17 @@ button {
 .btn-secondary:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
   color: var(--primary-strong);
+}
+
+.btn-danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--danger-contrast);
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: var(--danger-strong);
+  background: var(--danger-strong);
 }
 
 .btn-ghost {
@@ -766,6 +738,46 @@ textarea.input {
   border-top: 1px solid var(--border);
 }
 
+.backup-filename {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.backup-filename code {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.import-summary {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.import-warning {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 38%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface));
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.import-warning strong {
+  color: var(--warning);
+}
+
 .form-error {
   margin: 0;
   padding: 0.65rem 0.75rem;
@@ -913,11 +925,11 @@ textarea.input {
     padding-block: 0.9rem;
   }
 
-  .sync-panel {
+  .backup-panel {
     align-items: flex-end;
   }
 
-  .sync-actions .btn {
+  .backup-actions .btn {
     flex: 0 0 auto;
   }
 
@@ -954,7 +966,7 @@ textarea.input {
     height: 38px;
   }
 
-  .sync-actions .btn,
+  .backup-actions .btn,
   .toolbar-actions .btn {
     flex-basis: 100%;
   }

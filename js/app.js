@@ -1,19 +1,23 @@
 /**
  * MiLudoteca · lógica de la interfaz.
  *
- * Orquesta el estado local (localStorage), la sincronización manual con un
- * GitHub Gist y la importación de la colección CSV de BGG. Toda mutación se
- * persiste con saveLocalState(); los datos se pintan sin innerHTML.
+ * Orquesta el estado local (localStorage), las copias de seguridad en archivo
+ * JSON y la importación de la colección CSV de BGG. Toda mutación se persiste
+ * con saveLocalState(); los datos se pintan sin innerHTML.
  */
 
 import {
-  getAuthConfig,
+  getBackupMeta,
   loadLocalState,
-  pullFromGist,
-  pushToGist,
-  saveAuthConfig,
+  markBackupSaved,
+  removeLegacyAuth,
   saveLocalState,
-} from './services/gistSync.js';
+} from './services/localStore.js';
+import {
+  buildBackupFilename,
+  parseBackupFile,
+  serializeBackup,
+} from './services/backup.js';
 import { mergeBggCsv } from './services/csvParser.js';
 import './components/gameCard.js';
 
@@ -30,14 +34,13 @@ const relativeFormatter = new Intl.RelativeTimeFormat('es', {
   numeric: 'auto',
 });
 
-let state = { version: 1, lastSync: null, games: [], plays: [] };
+let state = { version: 1, games: [], plays: [] };
 const filters = { ownership: 'all', players: null };
-let syncing = false;
 let busy = false;
-let auth = { token: '', gistId: '' };
-let syncError = '';
 let activeGameId = null;
 let toastTimer = null;
+let pendingExport = null;
+let pendingImport = null;
 let els = {};
 
 /**
@@ -45,12 +48,12 @@ let els = {};
  * @returns {void}
  */
 function init() {
+  removeLegacyAuth();
   cacheElements();
-  auth = getAuthConfig();
   state = loadLocalState();
   bindEvents();
-  renderSyncStatus();
   render();
+  renderBackupStatus();
 }
 
 /**
@@ -59,12 +62,20 @@ function init() {
  */
 function cacheElements() {
   els = {
-    syncStatus: document.getElementById('sync-status'),
-    syncStatusText: document.getElementById('sync-status-text'),
-    syncLast: document.getElementById('sync-last'),
-    btnSyncConfig: document.getElementById('btn-sync-config'),
-    btnPull: document.getElementById('btn-pull'),
-    btnPush: document.getElementById('btn-push'),
+    backupStatus: document.getElementById('backup-status'),
+    backupStatusText: document.getElementById('backup-status-text'),
+    btnExport: document.getElementById('btn-export'),
+    btnImport: document.getElementById('btn-import'),
+    importBackupInput: document.getElementById('import-backup-input'),
+    dialogExport: document.getElementById('dialog-export'),
+    exportFilename: document.getElementById('export-filename'),
+    btnExportDownload: document.getElementById('btn-export-download'),
+    btnExportShare: document.getElementById('btn-export-share'),
+    dialogImport: document.getElementById('dialog-import'),
+    importSummary: document.getElementById('import-summary'),
+    importMeta: document.getElementById('import-meta'),
+    importCurrent: document.getElementById('import-current'),
+    btnImportConfirm: document.getElementById('btn-import-confirm'),
     playersInput: document.getElementById('players-filter'),
     btnPlayersClear: document.getElementById('btn-players-clear'),
     btnImportCsv: document.getElementById('btn-import-csv'),
@@ -90,11 +101,6 @@ function cacheElements() {
     playPlayers: document.getElementById('play-players'),
     playNotes: document.getElementById('play-notes'),
     playError: document.getElementById('play-error'),
-    dialogConfig: document.getElementById('dialog-config'),
-    formConfig: document.getElementById('form-config'),
-    configToken: document.getElementById('config-token'),
-    configGistId: document.getElementById('config-gist-id'),
-    configError: document.getElementById('config-error'),
     toast: document.getElementById('toast'),
     totalGames: document.getElementById('total-games'),
     totalPlays: document.getElementById('total-plays'),
@@ -130,11 +136,16 @@ function bindEvents() {
 
   els.formBorrowed.addEventListener('submit', handleBorrowedSubmit);
   els.formPlay.addEventListener('submit', handlePlaySubmit);
-  els.formConfig.addEventListener('submit', handleConfigSubmit);
 
-  els.btnSyncConfig.addEventListener('click', openConfigDialog);
-  els.btnPull.addEventListener('click', handlePull);
-  els.btnPush.addEventListener('click', handlePush);
+  els.btnExport.addEventListener('click', openExportDialog);
+  els.btnExportDownload.addEventListener('click', handleExportDownload);
+  els.btnExportShare.addEventListener('click', handleExportShare);
+
+  els.btnImport.addEventListener('click', () => {
+    els.importBackupInput.click();
+  });
+  els.importBackupInput.addEventListener('change', handleBackupFile);
+  els.btnImportConfirm.addEventListener('click', confirmImport);
 
   for (const button of els.closeDialogButtons) {
     button.addEventListener('click', () => {
@@ -397,22 +408,6 @@ function openBorrowedDialog() {
 }
 
 /**
- * Abre el diálogo de configuración sin exponer el token guardado.
- * @returns {void}
- */
-function openConfigDialog() {
-  const config = getAuthConfig();
-  els.configGistId.value = config.gistId;
-  els.configToken.value = '';
-  setFormError(els.configError, '');
-
-  if (!els.dialogConfig.open) {
-    els.dialogConfig.showModal();
-  }
-  els.configToken.focus();
-}
-
-/**
  * Valida y guarda el alta manual de un juego prestado.
  * @param {SubmitEvent} event Envío del formulario.
  * @returns {void}
@@ -532,33 +527,242 @@ function handlePlaySubmit(event) {
 }
 
 /**
- * Valida y persiste la configuración del Gist.
- * @param {SubmitEvent} event Envío del formulario.
+ * Abre el diálogo con el nombre y el contenido de la copia a exportar.
  * @returns {void}
  */
-function handleConfigSubmit(event) {
-  event.preventDefault();
-  setFormError(els.configError, '');
+function openExportDialog() {
+  const filename = buildBackupFilename();
+  const content = serializeBackup(state);
+  const file = new File([content], filename, { type: 'application/json' });
+
+  pendingExport = { filename, content, file };
+  els.exportFilename.textContent = filename;
+  els.btnExportShare.hidden = !canShareFile(file);
+
+  if (!els.dialogExport.open) {
+    els.dialogExport.showModal();
+  }
+}
+
+/**
+ * Indica si el navegador puede compartir el archivo por el menú del sistema.
+ * @param {File} file Archivo a compartir.
+ * @returns {boolean} true si Web Share API acepta archivos.
+ */
+function canShareFile(file) {
+  if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') {
+    return false;
+  }
 
   try {
-    saveAuthConfig(els.configToken.value, els.configGistId.value);
-    auth = getAuthConfig();
-    syncError = '';
-    els.configToken.value = '';
-    els.dialogConfig.close();
-    renderSyncStatus();
-    showToast(
-      'Configuración guardada. Ya podés bajar o subir tu Gist.',
-      'success'
-    );
+    return navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Descarga la copia pendiente como archivo JSON.
+ * @returns {void}
+ */
+function handleExportDownload() {
+  if (!pendingExport) {
+    return;
+  }
+
+  const { filename, content } = pendingExport;
+  const blob = new Blob([content], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  completeExport(`Copia guardada: ${filename}`);
+}
+
+/**
+ * Comparte la copia con el menú nativo (WhatsApp, email, Drive…).
+ * @returns {Promise<void>}
+ */
+async function handleExportShare() {
+  if (!pendingExport) {
+    return;
+  }
+
+  try {
+    await navigator.share({
+      files: [pendingExport.file],
+      title: 'MiLudoteca',
+      text: 'Copia de seguridad de MiLudoteca',
+    });
   } catch (error) {
-    console.error('[MiLudoteca] No se pudo guardar la configuración.', error);
-    setFormError(
-      els.configError,
-      error instanceof Error
-        ? error.message
-        : 'No se pudo guardar la configuración.'
+    if (error && error.name === 'AbortError') {
+      return;
+    }
+    console.error('[MiLudoteca] No se pudo compartir la copia.', error);
+    showToast('No se pudo compartir. Se descargará la copia.', 'info');
+    handleExportDownload();
+    return;
+  }
+
+  completeExport('Copia compartida.');
+}
+
+/**
+ * Cierra el diálogo de exportación y registra la copia como guardada.
+ * @param {string} message Texto del toast.
+ * @returns {void}
+ */
+function completeExport(message) {
+  markBackupSaved();
+  pendingExport = null;
+
+  if (els.dialogExport.open) {
+    els.dialogExport.close();
+  }
+
+  renderBackupStatus();
+  showToast(message, 'success');
+}
+
+/**
+ * Lee y valida una copia elegida, y abre el resumen de importación.
+ * @param {Event} event Cambio del input de archivo.
+ * @returns {Promise<void>}
+ */
+async function handleBackupFile(event) {
+  const input = event.currentTarget;
+  const file = input.files && input.files[0];
+
+  if (!file) {
+    return;
+  }
+
+  try {
+    const { state: importedState, exportedAt } = await parseBackupFile(file);
+    const exportedDate = exportedAt ? toDate(exportedAt) : null;
+
+    pendingImport = {
+      state: importedState,
+      exportedAt: exportedDate,
+      filename: file.name,
+    };
+
+    els.importSummary.textContent =
+      `La copia "${file.name}" tiene ${importedState.games.length} juegos ` +
+      `y ${importedState.plays.length} partidas.`;
+
+    if (exportedDate) {
+      els.importMeta.textContent = `Exportada el ${formatDate(exportedDate, true)}.`;
+      els.importMeta.hidden = false;
+    } else {
+      els.importMeta.textContent = '';
+      els.importMeta.hidden = true;
+    }
+
+    els.importCurrent.textContent =
+      `${state.games.length} juegos y ${state.plays.length} partidas`;
+
+    if (!els.dialogImport.open) {
+      els.dialogImport.showModal();
+    }
+  } catch (error) {
+    console.warn('[MiLudoteca] Copia de seguridad rechazada.', error);
+    pendingImport = null;
+    showToast(
+      error instanceof Error ? error.message : 'No se pudo leer la copia.',
+      'error'
     );
+  } finally {
+    input.value = '';
+  }
+}
+
+/**
+ * Reemplaza el estado local con la copia validada.
+ * @returns {void}
+ */
+function confirmImport() {
+  if (!pendingImport) {
+    return;
+  }
+
+  const imported = pendingImport;
+
+  if (!commitState(imported.state)) {
+    return;
+  }
+
+  markBackupSaved(imported.exportedAt || new Date());
+  pendingImport = null;
+
+  if (els.dialogImport.open) {
+    els.dialogImport.close();
+  }
+
+  render();
+  renderBackupStatus();
+  showToast(
+    `Copia cargada: ${imported.state.games.length} juegos y ` +
+      `${imported.state.plays.length} partidas.`,
+    'success'
+  );
+}
+
+/**
+ * Refleja en el header si hay una copia guardada y cambios pendientes.
+ * @returns {void}
+ */
+function renderBackupStatus() {
+  if (!els.backupStatus) {
+    return;
+  }
+
+  const meta = getBackupMeta();
+  const itemCount = state.games.length + state.plays.length;
+  let dataState = 'none';
+  let text = 'Sin copia de seguridad';
+  let title = '';
+  let disableExport = itemCount === 0;
+
+  if (itemCount === 0 && !meta.lastBackupAt) {
+    dataState = 'empty';
+    text = 'Sin datos todavía';
+    title = 'Importá tu colección de BGG o cargá una copia para empezar.';
+  } else if (meta.lastBackupAt && !meta.dirty) {
+    dataState = 'saved';
+    const relative = relativeTime(meta.lastBackupAt);
+    text = relative === 'recién' ? 'Copia guardada ahora' : `Copia guardada ${relative}`;
+    title = `Última copia: ${formatDate(meta.lastBackupAt, true)}`;
+  } else if (meta.lastBackupAt) {
+    dataState = 'pending';
+    text = 'Cambios sin guardar';
+    title = `Última copia: ${formatDate(meta.lastBackupAt, true)}`;
+  } else {
+    dataState = 'pending';
+    text = 'Sin copia de seguridad';
+    title = 'Todavía no guardaste una copia de esta colección.';
+  }
+
+  els.backupStatus.dataset.state = dataState;
+  els.backupStatusText.textContent = text;
+
+  if (title) {
+    els.backupStatus.title = title;
+  } else {
+    els.backupStatus.removeAttribute('title');
+  }
+
+  if (els.btnExport) {
+    els.btnExport.disabled = disableExport;
+    els.btnExport.title = disableExport
+      ? 'Todavía no hay datos para guardar'
+      : 'Descargar o compartir una copia';
   }
 }
 
@@ -575,12 +779,6 @@ async function handleCsvImport(event) {
     return;
   }
 
-  if (syncing) {
-    input.value = '';
-    showToast('Esperá a que termine la sincronización antes de importar.', 'info');
-    return;
-  }
-
   if (busy) {
     input.value = '';
     return;
@@ -590,7 +788,6 @@ async function handleCsvImport(event) {
   els.btnImportCsv.disabled = true;
   els.btnImportCsv.textContent = 'Importando…';
   els.btnImportCsv.setAttribute('aria-busy', 'true');
-  renderSyncStatus();
 
   try {
     const result = await mergeBggCsv(file, state);
@@ -618,148 +815,6 @@ async function handleCsvImport(event) {
     els.btnImportCsv.disabled = false;
     els.btnImportCsv.textContent = 'Importar CSV';
     els.btnImportCsv.removeAttribute('aria-busy');
-    renderSyncStatus();
-  }
-}
-
-/**
- * Baja el estado desde el Gist, con confirmación previa.
- * @returns {Promise<void>}
- */
-async function handlePull() {
-  if (!hasAuth()) {
-    showToast('Configurá el token y el gistId antes de bajar cambios.', 'error');
-    return;
-  }
-
-  if (syncing || busy) {
-    return;
-  }
-
-  const confirmed = window.confirm(
-    '¿Bajar el estado desde el Gist?\n\n' +
-      'Se reemplazará TODO el estado local (juegos y partidas) con el contenido ' +
-      'remoto. Las ediciones locales que no hayas subido se perderán.'
-  );
-  if (!confirmed) {
-    return;
-  }
-
-  syncing = true;
-  syncError = '';
-  renderSyncStatus();
-
-  try {
-    state = await pullFromGist();
-    render();
-    showToast('Estado bajado desde el Gist.', 'success');
-  } catch (error) {
-    console.error('[MiLudoteca] Error al bajar el Gist.', error);
-    syncError =
-      error instanceof Error ? error.message : 'Error inesperado de GitHub.';
-    showToast(`No se pudo bajar el Gist: ${syncError}`, 'error');
-  } finally {
-    syncing = false;
-    renderSyncStatus();
-  }
-}
-
-/**
- * Sube el estado al Gist, con confirmación previa.
- * @returns {Promise<void>}
- */
-async function handlePush() {
-  if (!hasAuth()) {
-    showToast('Configurá el token y el gistId antes de subir cambios.', 'error');
-    return;
-  }
-
-  if (syncing || busy) {
-    return;
-  }
-
-  const confirmed = window.confirm(
-    '¿Subir el estado al Gist?\n\n' +
-      'Se reemplazará el contenido remoto con el estado local actual. Los ' +
-      'cambios hechos en otro dispositivo que no hayas bajado se perderán.'
-  );
-  if (!confirmed) {
-    return;
-  }
-
-  syncing = true;
-  syncError = '';
-  renderSyncStatus();
-
-  try {
-    state = await pushToGist(state);
-    render();
-    showToast('Estado subido al Gist.', 'success');
-  } catch (error) {
-    console.error('[MiLudoteca] Error al subir el Gist.', error);
-    syncError =
-      error instanceof Error ? error.message : 'Error inesperado de GitHub.';
-    showToast(`No se pudo subir el Gist: ${syncError}`, 'error');
-  } finally {
-    syncing = false;
-    renderSyncStatus();
-  }
-}
-
-/**
- * Refleja el estado de sincronización en el header y habilita los botones.
- * @returns {void}
- */
-function renderSyncStatus() {
-  const configured = hasAuth();
-  let dataState = 'unconfigured';
-  let text = 'Sin configurar';
-  let detail = 'Configurá el token y el gistId para sincronizar.';
-  let detailTitle = '';
-
-  if (syncing) {
-    dataState = 'syncing';
-    text = 'Sincronizando…';
-    detail = 'Contactando a GitHub…';
-  } else if (syncError) {
-    dataState = 'error';
-    text = 'Error de sincronización';
-    detail = syncError;
-    detailTitle = syncError;
-  } else if (configured && state.lastSync) {
-    dataState = 'synced';
-    text = 'Sincronizado';
-    detail = `Última sync: ${relativeTime(state.lastSync)}`;
-    detailTitle = `Última sync: ${formatDate(state.lastSync, true)}`;
-  } else if (configured) {
-    dataState = 'ready';
-    text = 'Configurado';
-    detail = 'Todavía no sincronizaste.';
-  }
-
-  els.syncStatus.dataset.state = dataState;
-  els.syncStatusText.textContent = text;
-  els.syncLast.textContent = detail;
-
-  if (detailTitle) {
-    els.syncLast.title = detailTitle;
-  } else {
-    els.syncLast.removeAttribute('title');
-  }
-
-  const disabled = !configured || syncing || busy;
-  els.btnPull.disabled = disabled;
-  els.btnPush.disabled = disabled;
-
-  if (!configured) {
-    els.btnPull.title = 'Configurá el Gist para bajar cambios';
-    els.btnPush.title = 'Configurá el Gist para subir cambios';
-  } else if (syncing || busy) {
-    els.btnPull.title = 'Sincronización en curso';
-    els.btnPush.title = 'Sincronización en curso';
-  } else {
-    els.btnPull.title = 'Bajar cambios desde el Gist (reemplaza el estado local)';
-    els.btnPush.title = 'Subir cambios al Gist (reemplaza el estado remoto)';
   }
 }
 
@@ -771,6 +826,7 @@ function renderSyncStatus() {
 function commitState(nextState) {
   try {
     state = saveLocalState(nextState);
+    renderBackupStatus();
     return true;
   } catch (error) {
     console.error('[MiLudoteca] No se pudo guardar el estado local.', error);
@@ -802,14 +858,6 @@ function showToast(message, type = 'info') {
     els.toast.classList.remove('is-visible');
     toastTimer = null;
   }, TOAST_DURATION);
-}
-
-/**
- * Indica si hay token y gistId configurados.
- * @returns {boolean} true si la sincronización está disponible.
- */
-function hasAuth() {
-  return Boolean(auth.token && auth.gistId);
 }
 
 /**

@@ -11,7 +11,6 @@ const REQUIRED_FIELDS = ['objectid', 'objectname'];
 /**
  * @typedef {Object} LudotecaState
  * @property {number} version
- * @property {string|null} lastSync
  * @property {Array<Object>} games
  * @property {Array<Object>} plays
  */
@@ -37,7 +36,6 @@ function normalizeState(state) {
       typeof source.version === 'number' && Number.isFinite(source.version)
         ? source.version
         : 1,
-    lastSync: typeof source.lastSync === 'string' ? source.lastSync : null,
     games: Array.isArray(source.games) ? source.games : [],
     plays: Array.isArray(source.plays) ? source.plays : [],
   };
@@ -270,7 +268,6 @@ export async function mergeBggCsv(file, currentState) {
   return {
     state: {
       version: state.version,
-      lastSync: state.lastSync,
       games,
       plays: [...state.plays],
     },

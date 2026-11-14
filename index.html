@@ -16,7 +16,7 @@
     />
     <meta
       name="description"
-      content="MiLudoteca: tu colección de juegos de mesa y tu historial de partidas, con sincronización manual mediante un GitHub Gist privado."
+      content="MiLudoteca: tu colección de juegos de mesa y tu historial de partidas, con copias de seguridad en archivo JSON para moverlas entre dispositivos."
     />
     <title>MiLudoteca · Juegos de mesa y partidas</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
@@ -51,44 +51,32 @@
           </div>
         </div>
 
-        <section class="sync-panel" aria-label="Sincronización con GitHub Gist">
+        <section class="backup-panel" aria-label="Copia de seguridad">
           <div
-            id="sync-status"
-            class="sync-status"
-            data-state="unconfigured"
+            id="backup-status"
+            class="backup-status"
+            data-state="none"
             role="status"
             aria-live="polite"
           >
             <span class="status-dot" aria-hidden="true"></span>
-            <span class="status-copy">
-              <span id="sync-status-text" class="status-text">Sin configurar</span>
-              <span id="sync-last" class="status-last"
-                >Configurá el token y el gistId para sincronizar.</span
-              >
-            </span>
+            <span id="backup-status-text" class="status-text"
+              >Sin copia de seguridad</span
+            >
           </div>
-          <div class="sync-actions">
-            <button id="btn-sync-config" class="btn btn-secondary" type="button">
-              Configurar Gist
+          <div class="backup-actions">
+            <button id="btn-export" class="btn btn-primary" type="button">
+              Guardar copia
             </button>
-            <button
-              id="btn-pull"
-              class="btn btn-secondary"
-              type="button"
-              title="Configurá el Gist para bajar cambios"
-              disabled
-            >
-              Bajar
+            <button id="btn-import" class="btn btn-secondary" type="button">
+              Cargar copia
             </button>
-            <button
-              id="btn-push"
-              class="btn btn-primary"
-              type="button"
-              title="Configurá el Gist para subir cambios"
-              disabled
-            >
-              Subir
-            </button>
+            <input
+              id="import-backup-input"
+              type="file"
+              accept=".json,application/json"
+              hidden
+            />
           </div>
         </section>
       </div>
@@ -207,8 +195,8 @@
     <footer class="site-footer">
       <div class="footer-inner">
         <p>
-          MiLudoteca · Tus datos viven en este navegador y, si querés, en tu Gist
-          privado.
+          MiLudoteca · Tus datos viven en este navegador. Guardá una copia JSON
+          para llevarlos a otro dispositivo o tener un respaldo.
         </p>
         <div class="footer-stats" aria-label="Totales de la ludoteca">
           <span>Juegos <strong id="total-games">0</strong></span>
@@ -398,23 +386,19 @@
       </form>
     </dialog>
 
-    <dialog
-      id="dialog-config"
-      class="dialog"
-      aria-labelledby="dialog-config-title"
-    >
-      <form id="form-config" class="dialog-form" novalidate>
+    <dialog id="dialog-export" class="dialog" aria-labelledby="dialog-export-title">
+      <div class="dialog-form">
         <header class="dialog-header">
           <div>
-            <h2 id="dialog-config-title">Configurar GitHub Gist</h2>
+            <h2 id="dialog-export-title">Guardar copia</h2>
             <p class="dialog-subtitle">
-              Sincronización manual entre este navegador y tu Gist privado.
+              Descargá un archivo JSON o compartilo por WhatsApp, email o Drive.
             </p>
           </div>
           <button
             class="icon-btn"
             type="button"
-            data-close-dialog="dialog-config"
+            data-close-dialog="dialog-export"
             aria-label="Cerrar diálogo"
           >
             ×
@@ -422,61 +406,71 @@
         </header>
 
         <p class="dialog-copy">
-          El token se guarda solo en este navegador y nunca se muestra ni se envía
-          a otro sitio que no sea GitHub. Por seguridad, volvé a ingresarlo cada
-          vez que guardes cambios.
+          La copia incluye toda tu colección y tus partidas. Guardala en un lugar
+          seguro: es la forma de mover los datos a otro dispositivo.
         </p>
 
-        <div class="field">
-          <label for="config-token">
-            Token de GitHub <span class="required" aria-hidden="true">*</span>
-          </label>
-          <input
-            id="config-token"
-            class="input"
-            name="token"
-            type="password"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="ghp_…"
-            required
-          />
-        </div>
-
-        <div class="field">
-          <label for="config-gist-id">
-            Gist ID <span class="required" aria-hidden="true">*</span>
-          </label>
-          <input
-            id="config-gist-id"
-            class="input"
-            name="gistId"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="Ej. 1a2b3c4d5e6f…"
-            required
-          />
-          <p class="field-hint">
-            Necesitás un PAT con scope <code>gist</code> (token clásico) o permiso
-            <em>Gists: read and write</em> (fine-grained), y un Gist privado con el
-            archivo <code>miludoteca-db.json</code>.
-          </p>
-        </div>
-
-        <p id="config-error" class="form-error" role="alert" hidden></p>
+        <p class="backup-filename">
+          <span class="field-label">Archivo</span>
+          <code id="export-filename">miludoteca-2026-11-14.json</code>
+        </p>
 
         <footer class="dialog-actions">
           <button
             class="btn btn-ghost"
             type="button"
-            data-close-dialog="dialog-config"
+            data-close-dialog="dialog-export"
           >
             Cancelar
           </button>
-          <button class="btn btn-primary" type="submit">Guardar configuración</button>
+          <button id="btn-export-share" class="btn btn-secondary" type="button" hidden>
+            Compartir
+          </button>
+          <button id="btn-export-download" class="btn btn-primary" type="button">
+            Descargar
+          </button>
         </footer>
-      </form>
+      </div>
+    </dialog>
+
+    <dialog id="dialog-import" class="dialog" aria-labelledby="dialog-import-title">
+      <div class="dialog-form">
+        <header class="dialog-header">
+          <div>
+            <h2 id="dialog-import-title">Cargar copia</h2>
+            <p class="dialog-subtitle">Revisá el contenido antes de reemplazar tus datos.</p>
+          </div>
+          <button
+            class="icon-btn"
+            type="button"
+            data-close-dialog="dialog-import"
+            aria-label="Cerrar diálogo"
+          >
+            ×
+          </button>
+        </header>
+
+        <p id="import-summary" class="import-summary"></p>
+        <p id="import-meta" class="field-hint" hidden></p>
+        <p class="import-warning">
+          Se reemplazará tu colección actual
+          (<strong id="import-current">0 juegos y 0 partidas</strong>). Esta acción
+          no se puede deshacer.
+        </p>
+
+        <footer class="dialog-actions">
+          <button
+            class="btn btn-ghost"
+            type="button"
+            data-close-dialog="dialog-import"
+          >
+            Cancelar
+          </button>
+          <button id="btn-import-confirm" class="btn btn-danger" type="button">
+            Reemplazar colección
+          </button>
+        </footer>
+      </div>
     </dialog>
 
     <div

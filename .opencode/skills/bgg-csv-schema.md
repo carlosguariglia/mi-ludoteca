@@ -14,7 +14,7 @@ historial de partidas.
 ## 2. Entrada
 
 - Archivo CSV exportado desde BGG, codificación UTF-8, con fila de encabezados.
-- Librería: asumir `window.Papa` disponible globalmente vía CDN de PapaParse.
+- Librería: asumir `window.Papa` disponible globalmente desde `js/vendor/papaparse.min.js`.
 - Parseo:
 
   ```javascript
@@ -61,8 +61,8 @@ degrada campos editados a mano.
 - Nunca eliminar juegos ausentes del CSV: la colección de BGG puede estar filtrada o
   incompleta. Si se quiere borrar un juego, debe ser una acción manual del usuario.
 - No crear ni modificar `plays` durante la importación.
-- El resultado se persiste con `saveLocalState(estadoActualizado)` y no se envía
-  automáticamente al Gist: el usuario decide cuándo hacer `pushToGist()`.
+- El resultado se persiste con `saveLocalState(estadoActualizado)` y no se exporta
+  automáticamente: el usuario decide cuándo guardar una copia JSON.
 - Ante un CSV sin columnas esperadas o sin filas válidas, informar un error claro y no
   alterar el estado actual.
 
@@ -72,7 +72,7 @@ Devuelve una `Promise` con el estado fusionado y las estadísticas de la importa
 
 ```js
 {
-  state: { version, lastSync, games, plays },
+  state: { version, games, plays },
   stats: { added, updated, skipped }
 }
 ```
@@ -80,10 +80,10 @@ Devuelve una `Promise` con el estado fusionado y las estadísticas de la importa
 - `added`: juegos nuevos insertados.
 - `updated`: juegos existentes alcanzados por el CSV (aunque sus valores no cambien).
 - `skipped`: filas descartadas por no tener `objectid`.
-- `version` y `lastSync` se conservan del estado recibido (defaults `1` y `null`).
+- `version` se conserva del estado recibido (default `1`).
 - `plays` se devuelve intacto, en un array nuevo.
 - No muta `currentState` ni sus objetos, y no persiste: el llamador usa
-  `saveLocalState(state)` y decide si hace `pushToGist()`.
+  `saveLocalState(state)` y decide si actualiza la copia de seguridad.
 
 ## 7. Checklist de aceptación
 
